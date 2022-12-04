@@ -13,17 +13,23 @@ library(latex2exp)
 
 set.seed(1234)
 
-###Setting the data parameters for all simulations
+source("R/01a_main_functions.R")
+source("R/01b_helper_functions.R")
+
+### setup simulated data -------------------------------------------------------
+
+##Setting the data parameters for all simulations
 d <- c(4000, 4000, 4000, 4000, 4000, 400,400,400,400,4000,400,500,500,500,400,400,400,400,400,400, # Pre
        4000, 4000, 3000, 2000, 4000, 400,400,400,400,4000,400,500,500,500,200,400,400,400,400,100) # Post
-###Half are for the case, half for control
+##Half are for the case, half for control
 dd = length(d)/2
 
 ##Finding which are truly DE
 truth1 <- !(d[1:dd]==d[(dd+1):(2*dd)])##testing if the mean is different
 
+### unacknowledged bias of aldex2 and deseq2 -----------------------------------
 
-##Helper function for the ALDEx2 + DESeq2 analysis of FDR
+#Helper function for the ALDEx2 + DESeq2 analysis of FDR
 aldexDeseq_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99){
   ##Finding the number of taxa and which are different
   dd <- length(d)/2
@@ -83,6 +89,9 @@ for(i in 1:length(vals)){
 fdr.all = data.frame(vals = rep(vals,2), fdr = c(c(fdr.aldex),c(fdr.deseq)), method = rep(c("ALDEx2", "DESeq2"), each = length(vals)))
 fdr.all$method = as.factor(fdr.all$method)
 
+## create output directory if it doesn't already exist
+dir.create("results", showWarnings = FALSE)
+
 ggplot(fdr.all, aes(x=vals, y=fdr, color=method, fill = method, linetype = method)) +
   geom_line(alpha = 1, lwd = 1.1) +
   theme_bw()+
@@ -96,7 +105,9 @@ ggplot(fdr.all, aes(x=vals, y=fdr, color=method, fill = method, linetype = metho
   theme(legend.title = element_blank())
 ggsave(file.path("results", "unacknowledged_bias.pdf"), height=3, width=6)
 
-##Second, showing how ALDEx2 matches our SSRV
+
+### Second, showing how ALDEx2 matches our SSRV --------------------------------
+
 aldexSSRV_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99){
   ##Find the number of samples per condition
   dd <- length(d)/2
@@ -112,7 +123,7 @@ aldexSSRV_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99){
   afit <- append_sig(afit, function(x) sig_aldex2(x, pval=pval))
   
   ##Repeating with the SSRV version
-  ssrv <- run_fakeAldex(rdat, n_samples = 1000, gamma = 1e-3)
+  ssrv <- run_fakeAldex(rdat, n_samples = 1000, alpha = 1e-3)
   ssrv <- summary_aldex2(ssrv)
   ssrv <- append_sig(ssrv, function(x) sig_aldex2(x, pval = pval))
   
@@ -188,15 +199,15 @@ fakeAldex.simulation <- function(d, n, seq.depth, pval = 0.05, prob = .9, test =
   afit <- append_sig(afit, function(x) sig_aldex2(x, pval=pval))
   
   ##SSRV models
-  ssrv.delta <- run_fakeAldex(rdat, n_samples = 2000, gamma = 1e-3)
+  ssrv.delta <- run_fakeAldex(rdat, n_samples = 2000, alpha = 1e-3)
   ssrv.delta <- summary_aldex2(ssrv.delta)
   ssrv.delta <- append_sig(ssrv.delta, function(x) sig_aldex2(x, pval = pval))
   
-  ssrv.noise <- run_fakeAldex(rdat, n_samples = 2000, gamma = .5)
+  ssrv.noise <- run_fakeAldex(rdat, n_samples = 2000, alpha = .5)
   ssrv.noise <- summary_aldex2(ssrv.noise)
   ssrv.noise <- append_sig(ssrv.noise, function(x) sig_aldex2(x, pval = pval))
   
-  ssrv.coda <- run_fakeAldex(rdat, n_samples = 2000, gamma = 10)
+  ssrv.coda <- run_fakeAldex(rdat, n_samples = 2000, alpha = 10)
   ssrv.coda <- summary_aldex2(ssrv.coda)
   ssrv.coda <- append_sig(ssrv.coda, function(x) sig_aldex2(x, pval = pval))
   
@@ -241,7 +252,7 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
   X = as.character(coldata$Condition)
   
   ##Running for the first alpha and extracting the effect and p-value
-  fit <-run_fakeAldex(rdat, n_samples = 2000, gamma = alpha[1])
+  fit <-run_fakeAldex(rdat, n_samples = 2000, alpha = alpha[1])
   B <- matrix(NA, nrow = length(alpha), ncol = dd)
   pvals <- matrix(NA, nrow = length(alpha), ncol = dd)
   B[1,] <- fit$effect ##Creating and effect size: mean adjusted by length of CI
@@ -250,7 +261,7 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
   ##Now repeating for the rest of the values of alpha
   if (length(alpha) > 1){
     for (i in 2:length(alpha)) {
-      tmp = run_fakeAldex(rdat, n_samples = 2000, gamma = alpha[i])
+      tmp = run_fakeAldex(rdat, n_samples = 2000, alpha = alpha[i])
       B[i,] <- tmp$effect
       pvals[i,] <- ifelse(tmp$we.eBH < 0.05, TRUE, FALSE)
     }
