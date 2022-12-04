@@ -13,6 +13,10 @@ library(latex2exp)
 
 set.seed(1234)
 
+source("01a_main_functions.R")
+source("01b_helper_functions.R")
+dir.create("results")
+
 ###Setting the data parameters for all simulations
 d <- c(4000, 4000, 4000, 4000, 4000, 400,400,400,400,4000,400,500,500,500,400,400,400,400,400,400, # Pre
        4000, 4000, 3000, 2000, 4000, 400,400,400,400,4000,400,500,500,500,200,400,400,400,400,100) # Post
@@ -224,7 +228,7 @@ model.name.levels <- c("CoDA", "Relaxed",  "CLR", "ALDEx2", "DESeq2")
 fakeAldex.simulation(d, n = 50, seq.depth = 5000, test = "t", n_samples = 2000)
 
 ##Saving the graph
-ggsave(file.path("results", "sim_matrixGraph.pdf"), height=4, width=4.5)
+ggsave(file.path("results", "sim_matrixGraph.pdf"), height=5, width=7)
 
 
 plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
@@ -263,7 +267,7 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
     mutate("alpha" = alpha) %>%
     dplyr::select(alpha, everything()) %>%
     pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "pval")
-  
+
   B %>% 
     as.data.frame() %>%
     mutate("alpha" = alpha) %>%
@@ -280,7 +284,7 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
     geom_hline(yintercept=0, color="red", linetype = "dashed") +
     theme_bw() +
     ylab("Effect Size") +
-    coord_cartesian(ylim = c(-10,6)) +
+    coord_cartesian(ylim = c(-2,3)) +
     scale_y_reverse() +
     xlab(TeX("$\\alpha$")) +
     theme(text = element_text(size=18))+
@@ -288,6 +292,6 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
 }
 
 ##Running, plotting, and saving
-plot_alpha(d, alpha = seq(1e-3,4,by=.1))
+plot_alpha(d, alpha = seq(1e-3,2,by=.1))
 
-ggsave(file.path("results", "sim_alphaGraph.pdf"), height=4, width=5)
+ggsave(file.path("results", "sim_alphaGraph.pdf"), height=3, width=7)

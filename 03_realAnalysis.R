@@ -15,6 +15,8 @@ library(latex2exp)
 
 set.seed(1234)
 
+source("01a_main_functions.R")
+source("01b_helper_functions.R")
 
 # load data ---------------------------------------------------------------
 
@@ -157,9 +159,9 @@ plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
     geom_hline(yintercept=0, color="red", linetype = "dashed") +
     theme_bw() +
     ylab("Effect Size") +
-    coord_cartesian(ylim = c(-10,6)) +
+    coord_cartesian(ylim = c(-6,4)) +
     scale_y_reverse() +
-    xlab(TeX("$\\alpha$")) +
+    xlab(TeX("$\\tau$")) +
     theme(text = element_text(size=18))+
     theme(legend.position = "none") 
     
