@@ -332,8 +332,7 @@ aldex_scrv <- function(reads, conds, mc.samples=128, denom=NULL, alpha) {
   for (i in 1:n) {
     pi[,i,] <- t(rdirichlet(mc.samples, post.params[,i]))
   }
-
-  # sanity check on the data, should never fail
+  ## Sanity Check on the Data, Should Never Fail
   if ( any( !is.finite(pi))) stop("non-finite frequencies estimated")
 
   ## convert to log to make it easier to work with and then garbage collect
@@ -361,6 +360,16 @@ aldex_scrv <- function(reads, conds, mc.samples=128, denom=NULL, alpha) {
   post.mean <- apply(lw[,conds=="Post",], MARGIN=3, rowMeans)
   theta <- post.mean-pre.mean
 
+  ## Also calculate t-test
+  p.val.adj <- p.val <- matrix(NA, d,mc.samples)
+  for (i in 1:mc.samples) {
+    for (j in 1:d) {
+      fit <- t.test(lw[j,conds=="Pre",i], lw[j,conds=="Post",i])
+      p.val[j,i] <- fit$p.value
+    }
+    p.val.adj[,i] <- p.adjust(p.val[,i],method="BH")
+  }
+
   ## return effect size and "bayesian p-value"
   bpval <- rep(NA, d)
   for (i in 1:d) {
@@ -369,7 +378,8 @@ aldex_scrv <- function(reads, conds, mc.samples=128, denom=NULL, alpha) {
     bpval[i] <- min(cdf0, 1-cdf0)*2
   }
   ## not the right column names but this makes the code work nicely downstream
-   return(list(effect=rowMeans(theta), wi.eBH=bpval))
+  return(list(effect=rowMeans(theta), we.eBH=rowMeans(p.val.adj),
+              wi.eBH=rowMeans(p.val.adj), bpval=bpval))
 }
 
 run_fakeAldex <- function(dat, n_samples=2000, alpha=NULL, denom=NULL, ...){

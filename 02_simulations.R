@@ -180,7 +180,8 @@ ggplot(fdr.all, aes(x=vals, y=fdr, color=method, fill = method, linetype = metho
 ggsave(file.path("results", "recreating_aldex2.pdf"), height=3, width=6)
 
 
-###Third, the SSRV simulation over different total models
+### Third, the SSRV simulation over different total models -----------
+
 fakeAldex.simulation <- function(d, n, seq.depth, pval = 0.05, prob = .9, test = "t", n_samples = 2000){
   dd <- length(d)/2
   truth1 <- !(d[1:dd]==d[(dd+1):(2*dd)])##testing if the mean is different
@@ -238,6 +239,8 @@ fakeAldex.simulation(d, n = 50, seq.depth = 5000, test = "t", n_samples = 2000)
 ggsave(file.path("results", "sim_matrixGraph.pdf"), height=4, width=4.5)
 
 
+### Alpha Plot ---------------------------------------------
+
 plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
                        thresh=.9,...){
   dd <- length(d)/2
@@ -261,13 +264,12 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
   ##Now repeating for the rest of the values of alpha
   if (length(alpha) > 1){
     for (i in 2:length(alpha)) {
+      ## print(i)
       tmp = run_fakeAldex(rdat, n_samples = 2000, alpha = alpha[i])
       B[i,] <- tmp$effect
       pvals[i,] <- ifelse(tmp$we.eBH < 0.05, TRUE, FALSE)
     }
   }
-  
-
   
   P = pvals %>% as.data.frame %>%
     as.data.frame() %>%
