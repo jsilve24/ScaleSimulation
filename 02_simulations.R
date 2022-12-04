@@ -10,6 +10,7 @@ library(cowplot)
 library(gghighlight)
 library(directlabels)
 library(latex2exp)
+library(parallel)
 
 set.seed(1234)
 
@@ -106,7 +107,7 @@ ggplot(fdr.all, aes(x=vals, y=fdr, color=method, fill = method, linetype = metho
 ggsave(file.path("results", "unacknowledged_bias.pdf"), height=3, width=6)
 
 
-### Second, showing how ALDEx2 matches our SSRV --------------------------------
+### Second, showing how ALDEx2 matches our SSRV -------------------------
 
 aldexSSRV_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99){
   ##Find the number of samples per condition
@@ -242,7 +243,7 @@ ggsave(file.path("results", "sim_matrixGraph.pdf"), height=4, width=4.5)
 ### Alpha Plot ---------------------------------------------
 
 plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
-                       thresh=.9,...){
+                       thresh=.9, ncores=min(detectCores()-2, 1)...){
   dd <- length(d)/2
   truth1 <- !(d[1:dd]==d[(dd+1):(2*dd)])##testing if the mean is different
   dat <- create_true_abundances(d, n=n)
@@ -263,11 +264,23 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
   
   ##Now repeating for the rest of the values of alpha
   if (length(alpha) > 1){
-    for (i in 2:length(alpha)) {
-      ## print(i)
-      tmp = run_fakeAldex(rdat, n_samples = 2000, alpha = alpha[i])
-      B[i,] <- tmp$effect
-      pvals[i,] <- ifelse(tmp$we.eBH < 0.05, TRUE, FALSE)
+    if (ncores >1){
+    f <- function(alpha) {
+      tmp = run_fakeAldex(rdat, n_samples = 2000, alpha = alpha)
+      B <- tmp$effect
+      pvals <- ifelse(tmp$we.eBH < 0.05, TRUE, FALSE)
+      return(list(B=B, pvals=pvals))
+    }
+    res <- mclapply(as.list(alpha[-1]), f, mc.cores=ncores)
+    res <- res %>% transpose %>% map(~do.call(rbind, .))
+    B[-1,] <- res$B
+    pvals[-1,] <- res$pvals
+    } else {
+      for (i in 2:length(alpha)) {
+        tmp = run_fakeAldex(rdat, n_samples = 2000, alpha = alpha[i])
+        B[i,] <- tmp$effect
+        pvals[i,] <- ifelse(tmp$we.eBH < 0.05, TRUE, FALSE)
+      }
     }
   }
   
@@ -276,28 +289,57 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
     mutate("alpha" = alpha) %>%
     dplyr::select(alpha, everything()) %>%
     pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "pval")
+
+  ## Instead plot Sensitivity and Specificity as a Fuction of alpha
+  P <- P %>%
+    mutate(Sequence = substr(x = Sequence, start=2, stop=100),
+           Sequence = as.integer(Sequence),
+           truth=truth1[Sequence],
+           tp = pval&truth,
+           fp = pval & !truth,
+           tn = !pval & !truth,
+           fn = !pval & truth) %>%
+    group_by(alpha) %>%
+    summarise(tp=sum(tp),
+              tn=sum(tn),
+              fp=sum(fp),
+              fn=sum(fn)) %>%  
+    mutate(Sensitivity = tp/(tp+fn),
+           Specificity = tn/(tn+fp))
+
+  print(P, n=1000)
   
-  B %>% 
-    as.data.frame() %>%
-    mutate("alpha" = alpha) %>%
-    dplyr::select(alpha, everything()) %>%
-    pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "Effect") %>%
-    plyr::join(P, by = c("alpha", "Sequence")) %>%
-    mutate("Sequence" = sub("V", "", Sequence)) %>%
-    mutate("labl" = sub("V", "", Sequence)) %>%
-    mutate("labl" = ifelse(labl %in% c(3, 4, 15, 20), labl, NA)) %>%
-    ggplot(aes(x=alpha, y = Effect, group=Sequence)) +
-    geom_line() +
-    gghighlight((pval == TRUE), use_direct_label  = FALSE) +
-    gghighlight(!is.na(labl), unhighlighted_params = list(colour = NULL)) +
-    geom_hline(yintercept=0, color="red", linetype = "dashed") +
+  P %>%
+    dplyr::select(alpha, Sensitivity, Specificity) %>% 
+    pivot_longer(cols=!alpha, names_to = "Measure", values_to = "value") %>%
+    ggplot(aes(x=alpha, y=value)) + 
+    geom_line(aes(linetype = Measure, color=Measure)) + 
     theme_bw() +
-    ylab("Effect Size") +
-    coord_cartesian(ylim = c(-10,6)) +
-    scale_y_reverse() +
+    theme(axis.title.y=element_blank()) +
     xlab(TeX("$\\alpha$")) +
-    theme(text = element_text(size=18))+
-    theme(legend.position = "none") 
+    theme(text = element_text(size=18))
+
+  ## B %>% 
+  ##   as.data.frame() %>%
+  ##   mutate("alpha" = alpha) %>%
+  ##   dplyr::select(alpha, everything()) %>%
+  ##   pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "Effect") %>%
+  ##   plyr::join(P, by = c("alpha", "Sequence")) %>%
+  ##   mutate("Sequence" = sub("V", "", Sequence)) %>%
+  ##   mutate("labl" = sub("V", "", Sequence)) %>%
+  ##   mutate("labl" = ifelse(labl %in% c(3, 4, 15, 20), labl, NA)) %>%
+  ##   ggplot(aes(x=alpha, y = Effect, group=Sequence)) +
+  ##   geom_line() +
+  ##   gghighlight((pval == TRUE), use_direct_label  = FALSE) +
+  ##   gghighlight(!is.na(labl), unhighlighted_params = list(colour = NULL)) +
+  ##   geom_hline(yintercept=0, color="red", linetype = "dashed") +
+  ##   theme_bw() +
+  ##   ylab("Effect Size") +
+  ##   coord_cartesian(ylim = c(-10,6)) +
+  ##   scale_y_reverse() +
+  ##   xlab(TeX("$\\alpha$")) +
+  ##   theme(text = element_text(size=18))+
+  ##   theme(legend.position = "none") 
 }
 
 ##Running, plotting, and saving
