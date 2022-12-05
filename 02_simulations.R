@@ -18,17 +18,17 @@ source("01b_helper_functions.R")
 dir.create("results")
 
 ###Setting the data parameters for all simulations
-d <- c(4000, 4000, 4000, 4000, 4000, 400,400,400,400,4000,400,500,500,500,400,400,400,400,400,400, # Pre
-       4000, 4000, 3000, 2000, 4000, 400,400,400,400,4000,400,500,500,500,200,400,400,400,400,100) # Post
+d <- c(4000, 4000, 4000, 4000, 4000, 400,400,400,400,4000,400,500,500,500,400,400,400,400,400,400, # Pre # nolint
+       4000, 4000, 3000, 2000, 4000, 400,400,400,400,4000,400,500,500,500,200,400,400,400,400,100) # Post # nolint
 ###Half are for the case, half for control
-dd = length(d)/2
+dd <- length(d)/2
 
 ##Finding which are truly DE
-truth1 <- !(d[1:dd]==d[(dd+1):(2*dd)])##testing if the mean is different
+truth1 <- !(d[1:dd]==d[(dd+1):(2*dd)]) ## testing if the mean is different
 
 
 ##Helper function for the ALDEx2 + DESeq2 analysis of FDR
-aldexDeseq_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99){
+aldexDeseq_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99) {
   ##Finding the number of taxa and which are different
   dd <- length(d)/2
   truth1 <- !(d[1:dd]==d[(dd+1):(2*dd)])##testing if the mean is different
@@ -49,11 +49,11 @@ aldexDeseq_analysis <- function(d, n, seq.depth, pval = 0.05, prob = .99){
   afit <- append_sig(afit, function(x) sig_aldex2(x, pval=pval))
   
   ##Find the true positives and false positives for each
-  fp.deseq = sum(dfit$sig == TRUE & truth1 == FALSE)
-  tp.deseq = sum(dfit$sig == TRUE & truth1 == TRUE)
-  
-  fp.aldex = sum(afit$sig == TRUE & truth1 == FALSE)
-  tp.aldex = sum(afit$sig == TRUE & truth1 == TRUE)
+  fp.deseq <- sum(dfit$sig == TRUE & truth1 == FALSE)
+  tp.deseq <- sum(dfit$sig == TRUE & truth1 == TRUE)
+
+  fp.aldex <- sum(afit$sig == TRUE & truth1 == FALSE)
+  tp.aldex <- sum(afit$sig == TRUE & truth1 == TRUE)
   
   
   return(list("fp_deseq" = fp.deseq, "tp_deseq" = tp.deseq, "fp_aldex" = fp.aldex, "tp_aldex" = tp.aldex))
@@ -260,15 +260,14 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
     }
   }
   
-
-  
-  P = pvals %>% as.data.frame %>%
+  P <- pvals %>%
+    as.data.frame() %>%
     as.data.frame() %>%
     mutate("alpha" = alpha) %>%
     dplyr::select(alpha, everything()) %>%
     pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "pval")
 
-  B %>% 
+  B %>%
     as.data.frame() %>%
     mutate("alpha" = alpha) %>%
     dplyr::select(alpha, everything()) %>%
@@ -277,21 +276,21 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
     mutate("Sequence" = sub("V", "", Sequence)) %>%
     mutate("labl" = sub("V", "", Sequence)) %>%
     mutate("labl" = ifelse(labl %in% c(3, 4, 15, 20), labl, NA)) %>%
-    ggplot(aes(x=alpha, y = Effect, group=Sequence)) +
+    ggplot(aes(x = alpha, y = Effect, group = Sequence)) +
     geom_line() +
-    gghighlight((pval == TRUE), use_direct_label  = FALSE) +
+    gghighlight((pval == TRUE), use_direct_label = FALSE) +
     gghighlight(!is.na(labl), unhighlighted_params = list(colour = NULL)) +
-    geom_hline(yintercept=0, color="red", linetype = "dashed") +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
     theme_bw() +
-    ylab("Effect Size") +
-    coord_cartesian(ylim = c(-2,3)) +
+    ylab(TeX("$\\hat{\\theta}_d$")) +
+    coord_cartesian(ylim = c(-2, 3)) +
     scale_y_reverse() +
     xlab(TeX("$\\alpha$")) +
-    theme(text = element_text(size=18))+
-    theme(legend.position = "none") 
+    theme(text = element_text(size = 18)) +
+    theme(legend.position = "none")
 }
 
 ##Running, plotting, and saving
-plot_alpha(d, alpha = seq(1e-3,2,by=.1))
+plot_alpha(d, alpha = seq(1e-3, 2, by = .1))
 
 ggsave(file.path("results", "sim_alphaGraph.pdf"), height=3, width=7)

@@ -21,7 +21,7 @@ source("01b_helper_functions.R")
 # load data ---------------------------------------------------------------
 
 # Load sequence count data
-ps <- readRDS(file.path("data","phyloseq.rds"))
+ps <- readRDS(file.path("data", "phyloseq.rds"))
 
 # Extract key elements as its hard to amalgamate (see next section) from
 # w/in phyloseq
@@ -39,8 +39,8 @@ flow <- read.csv(file=file.path("data", "counts_with_batch.csv"), header=TRUE) %
 # preprocess data ---------------------------------------------------------
 
 # filter samples
-otu %>% colSums() %>% ecdf() %>% base::plot(xlim=c(0,50000))
-otu <- otu[,colSums(otu) > 10000] 
+otu %>% colSums() %>% ecdf() %>% base::plot(xlim=c(0, 50000))
+otu <- otu[, colSums(otu) > 10000]
 
 # Just take data from days 1 and 14 (only Hr4 from day 14) -- notice there are two sets from day 14
 samples_to_keep <- str_subset(sample_names(ps), "^Day(1|14).Hr4\\.")

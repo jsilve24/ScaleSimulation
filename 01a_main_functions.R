@@ -531,7 +531,7 @@ run_ssrv_mln <- function(dat,
   return(fit)
 }
 
-sig_tram <- function(s){
-  filter(s, sign(low)==sign(high))
+sig_tram <- function(s) {
+  filter(s, sign(low) == sign(high))
 }
 
