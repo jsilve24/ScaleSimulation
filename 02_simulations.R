@@ -282,7 +282,7 @@ plot_alpha <- function(d, n=50, seq.depth = 5000, alpha=seq(.01, 25, by=.5),
     gghighlight(!is.na(labl), unhighlighted_params = list(colour = NULL)) +
     geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
     theme_bw() +
-    ylab(TeX("$\\hat{\\theta}_d$")) +
+    ylab("Effect Size") +
     coord_cartesian(ylim = c(-2, 3)) +
     scale_y_reverse() +
     xlab(TeX("$\\alpha$")) +

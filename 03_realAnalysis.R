@@ -12,6 +12,7 @@ library(directlabels)
 library(matrixNormal)
 library(ggpattern)
 library(latex2exp)
+library(LaplacesDemon)
 
 set.seed(1234)
 
@@ -89,7 +90,9 @@ X <- model.matrix(~ base::I(vessel) + base::I(day) - 1,data = otu_filtered_metad
 options(ggrepel.max.overlaps = Inf)
 plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
                        thresh=.9, upsilon = NULL, Theta = NULL, 
-                       Gamma = NULL, Omega = NULL, Xi = NULL, total_model = "unif", sample.totals = NULL, sample = NULL, prob=.975, mean_lnorm = NULL, sd_lnorm = NULL, ...){
+                       Gamma = NULL, Omega = NULL, Xi = NULL, total_model = "unif",
+                       sample.totals = NULL, sample = NULL, prob=.975, mean_lnorm = NULL,
+                       sd_lnorm = NULL, ...){
   dd <- nrow(Y)
   alphaseq <- alpha
   
@@ -115,7 +118,10 @@ plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
   ##Fitting and extracting results for the first alpha
   fit <-ssrv.mln(as.matrix(Y),X,covariate = "base::I(day)14",
                             upsilon = upsilon, Gamma = Gamma,
-                            Theta = Theta, Omega = Omega, Xi = Xi, n_samples = 15000, sd_lnorm  = sqrt(alpha[1]^2/2),mean_lnorm = mean_lnorm, total_model = "logNormal", sample.totals =  sample.totals, sample = sample)
+                 Theta = Theta, Omega = Omega, Xi = Xi, n_samples = 15000,
+                 ## the next lines passes sd_lnorm = tau (in the notation of the manuscript)
+                 sd_lnorm  = sqrt(alpha[1]^2/2),mean_lnorm = mean_lnorm, total_model = "logNormal",
+                 sample.totals =  sample.totals, sample = sample)
 
   B <- matrix(NA, nrow = length(alpha), ncol = dd)
   pvals <- matrix(NA, nrow = length(alpha), ncol = dd)
@@ -126,8 +132,10 @@ plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
   if (length(alpha) > 1){
     for (i in 2:length(alpha)) {
       tmp = ssrv.mln(as.matrix(Y),X,covariate = "base::I(day)14",
-                                  upsilon = upsilon, Gamma = Gamma,
-                                  Theta = Theta, Omega = Omega, Xi = Xi, n_samples = 15000, sd_lnorm  = sqrt(alpha[i]^2/2),mean_lnorm = mean_lnorm,  total_model = "logNormal", sample.totals =  sample.totals, sample = sample)
+                     upsilon = upsilon, Gamma = Gamma,
+                     Theta = Theta, Omega = Omega, Xi = Xi, n_samples = 15000,
+                     sd_lnorm  = sqrt(alpha[i]^2/2),mean_lnorm = mean_lnorm,
+                     total_model = "logNormal", sample.totals =  sample.totals, sample = sample)
       B[i,] <- tmp$mean/(tmp$high - tmp$low)
       pvals[i,] <- ifelse(sign(tmp$low) == sign(tmp$high), 1, 0)
       }
@@ -135,33 +143,43 @@ plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
   
   P = pvals %>% as.data.frame %>%
     as.data.frame() %>%
-    mutate("alpha" = alpha) %>%
-    dplyr::select(alpha, everything()) %>%
-    pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "pval")
+    mutate("alpha" = alpha,
+           "tau" = sqrt(2*alpha^2)) %>%
+    dplyr::select(-alpha) %>%  
+    dplyr::select(tau, everything()) %>%
+    pivot_longer(cols = !tau, names_to = "Sequence", values_to = "pval")
   
   topValues <- colSums(pvals)[order(colSums(pvals), decreasing = TRUE)[1:10]]
   taxaToHighlight <- which(colSums(pvals) %in% topValues)
     
   p1 = B %>% 
     as.data.frame() %>%
-    mutate("alpha" = alpha) %>%
-    dplyr::select(alpha, everything()) %>%
-    pivot_longer(cols = !alpha, names_to = "Sequence", values_to = "Effect") %>%
-    plyr::join(P, by = c("alpha", "Sequence")) %>%
+    mutate("alpha" = alpha,
+           tau = sqrt(2*alpha^2)) %>%
+    dplyr::select(-alpha) %>% # 
+    dplyr::select(tau, everything()) %>%
+    pivot_longer(cols = !tau, names_to = "Sequence", values_to = "Effect") %>%
+    plyr::join(P, by = c("tau", "Sequence")) %>%
     mutate("Sequence" = sub("V", "", Sequence)) %>%
     mutate("labl" = sub("V", "", Sequence)) %>%
     mutate("labl" = ifelse(labl %in% taxaToHighlight, labl, NA)) %>%
-    mutate(Effect = Effect) %>%
-    ggplot(aes(x=alpha, y = Effect, group=Sequence)) +
+    mutate(Effect = Effect)
+
+  # This is not great practice but use a global assignment to easily make this available later
+  sensitivity_results <<- p1
+
+  p1 %>% 
+    ggplot(aes(x=tau, y = Effect, group=Sequence)) +
+    geom_hline(yintercept=0, color="red", linetype = "dashed") +
+    geom_vline(xintercept=0.5, colore="grey", linetype="dashed") +
     geom_line() +
     gghighlight((pval == TRUE), use_direct_label  = FALSE) +
     gghighlight(!is.na(labl), unhighlighted_params = list(colour = NULL)) +
-    geom_hline(yintercept=0, color="red", linetype = "dashed") +
     theme_bw() +
     ylab("Effect Size") +
-    coord_cartesian(ylim = c(-6,4)) +
+    coord_cartesian(ylim = c(-4,2)) +
     scale_y_reverse() +
-    xlab(TeX("$\\tau$")) +
+    xlab(TeX("$\\tau$")) + # TODO need to change scale to tau
     theme(text = element_text(size=18))+
     theme(legend.position = "none") 
     
@@ -178,7 +196,9 @@ flow_filtered_agg = flow_filtered %>%
   ungroup() %>%
   unique()
 
-plots = plot_alpha(Y,X, alpha=c(.1, .25, .5,1,  seq(2, 10, by=0.25)), total_model = "logNormal", mean_lnorm = rep(c(log(1),log(4)), each = 6), sample = 1:12, prob = .975)
+plots = plot_alpha(Y,X, alpha=c(.1, .25, .5,1,  seq(2, 7.5, by=0.25)),
+                   total_model = "logNormal", mean_lnorm = rep(c(log(1),log(4)), each = 6),
+                   sample = 1:12, prob = .975)
 plots$p1
 ggsave(file.path("results", "realData_alpha.pdf"), height=4, width=7)
 
@@ -212,6 +232,36 @@ fit_design <- ssrv.mln(as.matrix(Y),X, covariate = rownames(X)[7],
 fit_gs <- ssrv.mln(as.matrix(Y),X, covariate = rownames(X)[7],
                                upsilon = upsilon, Gamma = Gamma,
                                Theta = Theta, Omega = Omega, Xi = Xi, n_samples = 15000, total_model = "flow", sample.totals =flow_filtered, sample = flow_filtered_agg$sample_id, prob = 0.05)
+
+
+# Back to calculate sensitivity and specificity for alpha/sensitivity analysis -------------
+
+
+sig_tram_gs = sig_tram(fit_gs)
+truth <- fit_gs$category %in% sig_tram_gs$category
+
+tmp <- sensitivity_results %>%
+  mutate(Sequence = ifelse(Sequence != "Other", as.integer(Sequence), length(truth)), 
+         tp = truth[Sequence] & pval,
+         fp = !truth[Sequence] & pval,
+         tn = !truth[Sequence] & !pval, 
+         fn = truth[Sequence] & !pval) %>%
+  group_by(tau) %>%
+  summarise(tp = sum(tp, na.rm=TRUE),
+            fp = sum(fp, na.rm=TRUE),
+            tn = sum(tn, na.rm=TRUE),
+            fn = sum(fn, na.rm=TRUE)) %>%
+  mutate(Sensitivity = tp/(tp+fn)*100,
+         Specificity = tn/(tn+fp)*100)
+tmp %>%  
+  dplyr::select(tau, Sensitivity, Specificity) %>% 
+  pivot_longer(-tau, names_to = "Measure", values_to = "Value") %>%
+  ggplot(aes(x=tau, y=Value, color=Measure)) +
+  geom_line() +
+  theme_bw() +
+  xlab(TeX("$\\tau$"))
+
+
 
 
 # Analysis using DESeq2 and Aldex2 ----------------------------------------
@@ -304,7 +354,7 @@ p2 = ggplot(sig.df, aes(x=Sequence, y=Model)) +
 p2
 
 
-ggsave(file.path("results", "model_comparison_flowData.pdf"), height=4, width=5)
+ggsave(file.path("results", "model_comparison_flowData.pdf"), height=3, width=8)
 
 
 
@@ -428,17 +478,18 @@ fdr.all = data.frame(vals = rep(num.vessels,3), fdr = c(c(fdr[,3]),c(fdr[,4]), c
 fdr.all$method = as.factor(fdr.all$method)
 
 ggplot(fdr.all, aes(x=vals, y=fdr, color=method, fill = method, linetype = method)) +
+  geom_hline(yintercept=15/32, linetype="dashed", color = "grey") +
   geom_line(alpha = 1, lwd = 1.1) +
   theme_bw()+
   xlim(c(6,50)) +
-  ylim(c(0,1))+
+  ylim(c(0,0.5))+
   xlab("Number of Vessels per Condition") +
   ylab("False Discovery Rate") + 
   scale_color_manual(values=c("#AF4BCE", "#EA7369", "#2b83ba")) + 
   scale_linetype_manual(values = c("dotted", "twodash", "longdash")) +
   theme(text=element_text(size=14)) + 
-  geom_hline(yintercept=15/32, linetype="dashed", color = "grey") +
   theme(legend.title = element_blank()) +
   theme(legend.position = c(.65, .825))
+
 ggsave(file.path("results", "unacknowledged_bias_realData.pdf"), height=4, width=4.5)
 
