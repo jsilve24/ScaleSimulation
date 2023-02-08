@@ -92,7 +92,7 @@ plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
                        thresh=.9, upsilon = NULL, Theta = NULL, 
                        Gamma = NULL, Omega = NULL, Xi = NULL, total_model = "unif",
                        sample.totals = NULL, sample = NULL, prob=.975, mean_lnorm = NULL,
-                       sd_lnorm = NULL, ...){
+                       sd_lnorm = NULL, n_highlight=10, ...){
   dd <- nrow(Y)
   alphaseq <- alpha
   
@@ -149,7 +149,7 @@ plot_alpha <- function(Y, X, alpha=seq(0.01, 10, by=.5),
     dplyr::select(tau, everything()) %>%
     pivot_longer(cols = !tau, names_to = "Sequence", values_to = "pval")
   
-  topValues <- colSums(pvals)[order(colSums(pvals), decreasing = TRUE)[1:10]]
+  topValues <- colSums(pvals)[order(colSums(pvals), decreasing = TRUE)[1:n_highlight]]
   taxaToHighlight <- which(colSums(pvals) %in% topValues)
     
   p1 = B %>% 
@@ -198,7 +198,7 @@ flow_filtered_agg = flow_filtered %>%
 
 plots = plot_alpha(Y,X, alpha=c(.1, .25, .5,1,  seq(2, 7.5, by=0.25)),
                    total_model = "logNormal", mean_lnorm = rep(c(log(1),log(4)), each = 6),
-                   sample = 1:12, prob = .975)
+                   sample = 1:12, prob = .975, n_highlight=5)
 plots$p1
 ggsave(file.path("results", "realData_alpha.pdf"), height=4, width=7)
 
